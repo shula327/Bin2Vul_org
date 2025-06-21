@@ -159,7 +159,7 @@ python manage.py runserver
    python manage.py migrate --fake-initial
    ```
 
-## Security Guidelines
+## 💌Security Guidelines
 - Regular dependency updates
 - Environment variable management with .env
 - File upload size restrictions
