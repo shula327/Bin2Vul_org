@@ -1,0 +1,117 @@
+{% extends 'core/base.html' %}
+{% load core_filters %}
+
+{% block title %}用户分析记录 - Bin2Vul{% endblock %}
+
+{% block content %}
+<div class="admin-theme">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'admin_dashboard' %}">管理员仪表盘</a></li>
+                    <li class="breadcrumb-item active">用户分析记录</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-2">{{ target_user.username }} 的分析记录</h1>
+            <p class="text-muted">用户邮箱: {{ target_user.email }} | 注册时间: {{ target_user.date_joined|date:"Y-m-d H:i" }}</p>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <div class="list-group mb-4">
+                <a href="{% url 'admin_dashboard' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-tachometer-alt me-2"></i>仪表盘
+                </a>
+                <a href="{% url 'admin_upload_vulnerability' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-file-upload me-2"></i>上传漏洞样本
+                </a>
+                <a href="{% url 'admin_update_model' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-cogs me-2"></i>更新分析模型
+                </a>
+                <a href="{% url 'dashboard' %}" class="list-group-item list-group-item-action">
+                    <i class="fas fa-home me-2"></i>返回用户仪表盘
+                </a>
+            </div>
+            
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">用户操作</h5>
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'admin_reset_user_password' target_user.id %}" class="btn btn-outline-primary">
+                            <i class="fas fa-key me-2"></i>重置密码
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-history me-2"></i>所有分析记录
+                    </h5>
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th scope="col">ID</th>
+                                    <th scope="col">分析类型</th>
+                                    <th scope="col">文件名</th>
+                                    <th scope="col">时间</th>
+                                    <th scope="col">相似度</th>
+                                    <th scope="col">漏洞类型</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for analysis in analyses %}
+                                <tr>
+                                    <th scope="row">{{ analysis.id }}</th>
+                                    <td>
+                                        {% if analysis.analysis_type == 'vulnerability' %}
+                                        <span class="badge bg-danger">漏洞函数分析</span>
+                                        {% else %}
+                                        <span class="badge bg-primary">二进制比对</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if analysis.analysis_type == 'binary_compare' %}
+                                        {{ analysis.file1.name|truncatechars:20 }} vs {{ analysis.file2.name|truncatechars:20 }}
+                                        {% else %}
+                                        {{ analysis.file1.name|truncatechars:30 }}
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ analysis.created_at|date:"Y-m-d H:i" }}</td>
+                                    <td>
+                                        {% if analysis.analysis_type == 'binary_compare' and analysis.similarity_score is not None %}
+                                        <span class="badge {% if analysis.similarity_score >= 0.8 %}bg-danger{% elif analysis.similarity_score >= 0.5 %}bg-warning{% else %}bg-info{% endif %}">
+                                            {{ analysis.get_similarity_percentage|floatformat:2 }}%
+                                        </span>
+                                        {% elif analysis.analysis_type == 'binary_compare' and analysis.similarity_score is None %}
+                                        <span class="badge bg-secondary">分析失败</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if analysis.analysis_type == 'vulnerability' and analysis.remarks %}
+                                        <span class="badge bg-danger">{{ analysis.remarks }}</span>
+                                        {% else %}
+                                        <span>-</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center">没有找到分析记录</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

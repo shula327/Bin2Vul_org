@@ -1,0 +1,262 @@
+{% extends 'core/base.html' %}
+
+{% block title %}二进制代码函数比对 - Bin2Vul{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首页</a></li>
+                <li class="breadcrumb-item active">二进制代码函数比对</li>
+            </ol>
+        </nav>
+        <h1 class="h3 mb-2">二进制代码函数比对</h1>
+        <p class="text-muted">上传两个二进制文件，系统将分析它们的函数之间的相似度</p>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.file1.id_for_label }}" class="form-label">
+                            <i class="fas fa-file-code me-2"></i>二进制文件 1
+                        </label>
+                        {{ form.file1 }}
+                        {% if form.file1.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.file1.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">支持的文件格式：ELF, EXE</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label for="{{ form.file2.id_for_label }}" class="form-label">
+                            <i class="fas fa-file-code me-2"></i>二进制文件 2
+                        </label>
+                        {{ form.file2 }}
+                        {% if form.file2.errors %}
+                            <div class="text-danger small mt-1">
+                                {{ form.file2.errors|join:", " }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">支持的文件格式：ELF, EXE</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            <i class="fas fa-code-compare me-2"></i>开始比对
+                        </button>
+                    </div>
+                </form>
+                <!-- 分析进度条，默认隐藏 -->
+                <div id="analysisProgress" class="mt-4 d-none">
+                    <p class="text-center mb-2">正在进行二进制比对，请稍候...</p>
+                    <div class="progress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                             role="progressbar" 
+                             aria-valuenow="0" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100" 
+                             style="width: 0%">
+                            <span id="progressText">0%</span>
+                        </div>
+                    </div>
+                    <p class="text-center small text-muted mt-2" id="analysisStage">准备分析二进制文件...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-info-circle me-2"></i>使用说明
+                </h5>
+                <div class="card-text">
+                    <p>本功能用于比对两个二进制文件函数的相似度，可以帮助您：</p>
+                    <ul class="mb-0">
+                        <li>检测代码克隆或抄袭</li>
+                        <li>识别恶意软件变种</li>
+                        <li>分析软件版本差异</li>
+                        <li>评估代码重用程度</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if similarity_score is not None %}
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-chart-pie me-2"></i>分析结果
+                </h5>
+                
+                <div class="row">
+                    <div class="col-md-3 text-center mb-3">
+                        <div class="display-4 mb-2">{{ similarity_percentage|floatformat:2 }}%</div>
+                        <p class="text-muted mb-0">总体相似度</p>
+                    </div>
+                    
+                    <div class="col-md-9">
+                        {% if top_pairs %}
+                        <div class="chart-container" style="position: relative; height:240px; width:100%">
+                            <canvas id="similarityChart"></canvas>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                {% if top_pairs %}
+                <hr>
+                <h6 class="card-subtitle mb-3">
+                    <i class="fas fa-list me-2"></i>最相似函数对
+                </h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>函数1</th>
+                                <th>函数2</th>
+                                <th>相似度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pair in top_pairs %}
+                            <tr>
+                                <td><code>{{ pair.func1 }}</code></td>
+                                <td><code>{{ pair.func2 }}</code></td>
+                                <td>{{ pair.percentage|floatformat:2 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    const analysisProgress = document.getElementById('analysisProgress');
+    const progressBar = analysisProgress ? analysisProgress.querySelector('.progress-bar') : null;
+    const progressText = document.getElementById('progressText');
+    const analysisStage = document.getElementById('analysisStage');
+
+    // 分析阶段描述
+    const analysisStages = [
+        "准备分析二进制文件...",
+        "提取函数特征...",
+        "比对函数...",
+        "分析相似度...",
+        "生成比对报告...",
+        "完成分析"
+    ];
+
+    form.addEventListener('submit', function() {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>正在分析中...';
+        // 显示进度条
+        if (analysisProgress) analysisProgress.classList.remove('d-none');
+        // 模拟进度更新
+        let progress = 0;
+        let stageIndex = 0;
+        function updateProgress() {
+            if (progress < 95) {
+                const stageIncrement = Math.random() * 5 + 2;
+                progress += stageIncrement;
+                if (progress > (stageIndex + 1) * 20) {
+                    stageIndex = Math.min(stageIndex + 1, analysisStages.length - 1);
+                    if (analysisStage) analysisStage.textContent = analysisStages[stageIndex];
+                }
+                progress = Math.min(progress, 95);
+                if (progressBar) progressBar.style.width = progress + '%';
+                if (progressBar) progressBar.setAttribute('aria-valuenow', progress);
+                if (progressText) progressText.textContent = Math.round(progress) + '%';
+                setTimeout(updateProgress, 500 + Math.random() * 1000);
+            }
+        }
+        updateProgress();
+    });
+
+    {% if top_pairs %}
+    // 创建相似度图表
+    const ctx = document.getElementById('similarityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [
+                {% for pair in top_pairs %}
+                '{{ pair.func1|truncatechars:15 }} - {{ pair.func2|truncatechars:15 }}',
+                {% endfor %}
+            ],
+            datasets: [{
+                label: '函数对相似度',
+                data: [
+                    {% for pair in top_pairs %}
+                    {{ pair.percentage }},
+                    {% endfor %}
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    title: {
+                        display: true,
+                        text: '相似度 (%)'
+                    }
+                },
+                x: {
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: '最相似函数对比较'
+                },
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %} 

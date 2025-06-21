@@ -1,0 +1,97 @@
+{% extends 'core/base.html' %}
+{% load core_filters %}
+
+{% block title %}仪表盘 - Bin2Vul{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>欢迎使用 Bin2Vul</h1>
+    <p>选择下面的功能开始您的分析工作</p>
+</div>
+
+<div class="row g-4">
+    <!-- 二进制比对卡片 -->
+    <div class="col-md-6">
+        <div class="feature-card binary-compare">
+            <div class="feature-icon">
+                <i class="fas fa-code-compare"></i>
+            </div>
+            <h3>二进制比对</h3>
+            <p>比较两个二进制文件的相似度，帮助您识别代码克隆和重用。通过先进的机器学习算法，准确定位相似代码片段。</p>
+            <a href="{% url 'binary_compare' %}" class="btn btn-primary">
+                <i class="fas fa-arrow-right me-2"></i>开始比对
+            </a>
+        </div>
+    </div>
+
+    <!-- 漏洞函数分析卡片 -->
+    <div class="col-md-6">
+        <div class="feature-card vulnerability">
+            <div class="feature-icon">
+                <i class="fas fa-shield-alt"></i>
+            </div>
+            <h3>漏洞函数分析</h3>
+            <p>分析二进制文件中的潜在漏洞，提供详细的安全评估报告。基于深度学习模型，快速识别常见安全漏洞。</p>
+            <a href="{% url 'vulnerability_analysis' %}" class="btn btn-danger">
+                <i class="fas fa-arrow-right me-2"></i>开始分析
+            </a>
+        </div>
+    </div>
+</div>
+
+{% if history %}
+<div class="history-section">
+    <h2>最近的分析记录</h2>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>分析类型</th>
+                    <th>文件名</th>
+                    <th>分析时间</th>
+                    <th>查看详情</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in history %}
+                <tr>
+                    <td>
+                        {% if record.analysis_type == 'binary_compare' %}
+                        <i class="fas fa-code-compare me-2 text-primary"></i>二进制比对
+                        {% else %}
+                        <i class="fas fa-shield-alt me-2 text-danger"></i>漏洞函数分析
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if record.analysis_type == 'binary_compare' %}
+                        {{ record.file1.name|truncatechars:20 }} vs {{ record.file2.name|truncatechars:20 }}
+                        {% else %}
+                        {{ record.file1.name|truncatechars:30 }}
+                        {% endif %}
+                    </td>
+                    <td>{{ record.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        {% if record.similarity_score is not None %}
+                        <a href="{% url 'analysis_detail' record.id %}" class="btn btn-primary btn-sm btn-icon">
+                            <i class="fas fa-search"></i>
+                        </a>
+                        {% else %}
+                        <span class="badge bg-secondary">分析失败</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'delete_history' record.id %}" 
+                           class="btn btn-outline-danger btn-sm"
+                           onclick="return confirm('确定要删除这条历史记录吗？')">
+                            <i class="fas fa-trash-alt"></i> 删除
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+{% endblock %} 

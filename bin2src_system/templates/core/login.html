@@ -1,0 +1,68 @@
+{% extends 'core/base.html' %}
+
+{% block title %}登录 - Bin2Vul{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="fas fa-microchip fa-3x text-primary mb-3"></i>
+                    <h2 class="card-title">Bin2Vul</h2>
+                    <p class="text-muted">二进制代码分析系统</p>
+                </div>
+                
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.username.id_for_label }}" class="form-label">{{ form.username.label }}</label>
+                        {{ form.username }}
+                        {% if form.username.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.username.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.password.id_for_label }}" class="form-label">{{ form.password.label }}</label>
+                        {{ form.password }}
+                        {% if form.password.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.password.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="{{ form.captcha.id_for_label }}" class="form-label">{{ form.captcha.label }}</label>
+                        {{ form.captcha }}
+                        {% if form.captcha.errors %}
+                        <div class="text-danger small mt-1">
+                            {{ form.captcha.errors|join:", " }}
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt me-2"></i>登录
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="text-center mt-3">
+                    <p class="mb-0">还没有账号？ <a href="{% url 'register' %}" class="text-primary">立即注册</a></p>
+                </div>
+                
+                <!-- 保留管理员提示，但样式更简洁 -->
+                <div class="text-center small text-muted mt-3">
+                    <p><i class="fas fa-info-circle me-1"></i> 管理员用户请使用相同登录入口，登录后可在右上角找到管理员面板。（注册请通过后台）</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

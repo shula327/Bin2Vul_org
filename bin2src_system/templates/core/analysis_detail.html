@@ -1,0 +1,762 @@
+{% extends 'core/base.html' %}
+{% load core_filters %}
+
+{% block title %}分析详情 - Bin2Vul{% endblock %}
+
+{% block content %}
+<div class="{% if analysis.analysis_type == 'vulnerability' %}vulnerability-theme{% else %}binary-compare-theme{% endif %}">
+    <div class="row mb-4">
+        <div class="col-12">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'dashboard' %}">首页</a></li>
+                    <li class="breadcrumb-item active">分析详情</li>
+                </ol>
+            </nav>
+            <h1 class="h3 mb-2">
+                {% if analysis.analysis_type == 'vulnerability' %}
+                漏洞函数分析详情
+                {% else %}
+                二进制比对详情
+                {% endif %}
+            </h1>
+            <p class="text-muted">
+                分析时间: {{ analysis.created_at|date:"Y-m-d H:i" }}
+            </p>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        <!-- 概览信息 -->
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-chart-pie me-2"></i>分析结果概览
+                </h5>
+                
+                {% if analysis.analysis_type == 'vulnerability' %}
+                <div class="alert alert-{% if similarity_percentage > 70 %}danger{% elif similarity_percentage > 50 %}warning{% else %}info{% endif %} mb-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-{% if similarity_percentage > 70 %}exclamation-triangle{% elif similarity_percentage > 50 %}exclamation-circle{% else %}info-circle{% endif %} fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="alert-heading">检测到可能的漏洞</h5>
+                            <p class="mb-0">漏洞类型: <strong>{{ vulnerability_type }}</strong></p>
+                            <p class="mb-0">相似度: <strong>{{ similarity_percentage|floatformat:2 }}%</strong></p>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="alert alert-{% if similarity_percentage > 70 %}primary{% elif similarity_percentage > 50 %}info{% else %}secondary{% endif %} mb-4">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-shrink-0">
+                            <i class="fas fa-{% if similarity_percentage > 70 %}check-circle{% elif similarity_percentage > 50 %}info-circle{% else %}circle{% endif %} fa-2x"></i>
+                        </div>
+                        <div class="flex-grow-1 ms-3">
+                            <h5 class="alert-heading">二进制文件比对结果</h5>
+                            <p class="mb-0">相似度: <strong>{{ similarity_percentage|floatformat:2 }}%</strong></p>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="file-info mb-4">
+                    <h6 class="mb-3">文件信息</h6>
+                    <div class="table-responsive">
+                        <table class="table table-bordered">
+                            <tbody>
+                                <tr>
+                                    <th scope="row" style="width: 30%;">文件名</th>
+                                    <td>{{ analysis.file1.name }}</td>
+                                </tr>
+                                {% if analysis.file2 %}
+                                <tr>
+                                    <th scope="row">比对文件</th>
+                                    <td>{{ analysis.file2.name }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th scope="row">分析类型</th>
+                                    <td>
+                                        {% if analysis.analysis_type == 'vulnerability' %}
+                                        <span class="badge bg-danger">漏洞函数分析</span>
+                                        {% else %}
+                                        <span class="badge bg-primary">二进制比对</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th scope="row">分析时间</th>
+                                    <td>{{ analysis.created_at|date:"Y-m-d H:i:s" }}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>返回仪表盘
+                    </a>
+                    <a href="{% url 'delete_history' analysis.id %}" 
+                       class="btn btn-outline-danger"
+                       onclick="return confirm('确定要删除这条历史记录吗？')">
+                        <i class="fas fa-trash-alt me-2"></i>删除此记录
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        {% if analysis.analysis_type == 'vulnerability' %}
+        
+        <!-- 函数级别漏洞分析结果 (如果是新格式的数据) -->
+        {% if function_results %}
+        <div class="card mt-4">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-code me-2"></i>函数级别漏洞分析
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">函数名</th>
+                                <th scope="col">漏洞类型</th>
+                                <th scope="col">相似度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in function_results %}
+                            <tr class="{% if forloop.first %}table-danger{% endif %}">
+                                <th scope="row">{{ forloop.counter }}</th>
+                                <td>
+                                    {{ result.func_name }}
+                                    <div class="small text-muted">偏移量: {{ result.func_offset }}</div>
+                                </td>
+                                <td>{{ result.vulnerability_type }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-{% if result.similarity_percentage > 70 %}danger{% elif result.similarity_percentage > 40 %}warning{% else %}info{% endif %}"
+                                                 role="progressbar"
+                                                 style="width: {{ result.similarity_percentage }}%"
+                                                 aria-valuenow="{{ result.similarity_percentage }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <span class="ms-2">{{ result.similarity_percentage|floatformat:2 }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 漏洞类型分布 (如果是新格式的数据) -->
+        {% if vuln_type_percentages %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="fas fa-chart-pie me-2"></i>漏洞类型分布
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- 饼状图容器 - 占用40%宽度 -->
+                    <div class="col-md-5">
+                        <canvas id="vulnTypePieChart" width="280" height="200"></canvas>
+                    </div>
+                    
+                    <!-- 表格容器 - 占用60%宽度 -->
+                    <div class="col-md-7">
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr>
+                                        <th>漏洞类型</th>
+                                        <th>函数数量</th>
+                                        <th>比例</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for vuln_type, data in vuln_type_percentages.items %}
+                                    <tr>
+                                        <td>{{ vuln_type }}</td>
+                                        <td>{{ data.count }}</td>
+                                        <td>{{ data.percentage|floatformat:1 }}%</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- 相似度结果列表 (旧格式的数据) -->
+        {% if top_results %}
+        <div class="card mt-4">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-code me-2"></i>漏洞相似度详情
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">漏洞源码</th>
+                                <th scope="col">相似度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for file, score, percentage in top_results %}
+                            <tr class="{% if forloop.first %}table-danger{% endif %}">
+                                <th scope="row">{{ forloop.counter }}</th>
+                                <td>{{ file }}</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-{% if percentage > 70 %}danger{% elif percentage > 50 %}warning{% else %}info{% endif %}"
+                                                 role="progressbar"
+                                                 style="width: {{ percentage }}%"
+                                                 aria-valuenow="{{ percentage }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <span class="ms-2">{{ percentage|floatformat:2 }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% else %}
+        <!-- 二进制比对结果 -->
+        {% if top_pairs %}
+        <div class="card mt-4">
+            <div class="card-header bg-primary text-white">
+                <i class="fas fa-code-branch me-2"></i>函数对比结果
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">函数1</th>
+                                <th scope="col">函数2</th>
+                                <th scope="col">相似度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for pair in top_pairs %}
+                            <tr class="{% if forloop.first %}table-primary{% endif %}">
+                                <th scope="row">{{ forloop.counter }}</th>
+                                <td><code>{{ pair.func1 }}</code></td>
+                                <td><code>{{ pair.func2 }}</code></td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="progress flex-grow-1" style="height: 8px;">
+                                            <div class="progress-bar bg-{% if pair.percentage > 70 %}primary{% elif pair.percentage > 50 %}info{% else %}secondary{% endif %}"
+                                                 role="progressbar"
+                                                 style="width: {{ pair.percentage }}%"
+                                                 aria-valuenow="{{ pair.percentage }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="100">
+                                            </div>
+                                        </div>
+                                        <span class="ms-2">{{ pair.percentage|floatformat:2 }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endif %}
+        
+        <div class="text-muted mt-3">
+            <p class="small">* 相似度分数基于二进制代码的匹配程度。分数越高，表示匹配度越高。</p>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        {% if analysis.analysis_type == 'vulnerability' and vulnerability_type %}
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <i class="fas fa-bug me-2"></i>漏洞信息
+            </div>
+            <div class="card-body">
+                <h5 class="card-title">{{ vulnerability_type }}</h5>
+                <p class="card-text">
+                    <strong>相似度:</strong> {{ similarity_percentage|floatformat:2 }}%
+                </p>
+                <p class="card-text">
+                    {% if 'CWE-' in vulnerability_type %}
+                    {% with cwe_match=vulnerability_type|cwe_extract %}
+                    {% if cwe_match %}
+                    <a href="https://cwe.mitre.org/data/definitions/{{ cwe_match }}.html" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">
+                        <i class="fas fa-external-link-alt me-1"></i>查看CWE-{{ cwe_match }}详情
+                    </a>
+                    <button id="quick-search-cwe" class="btn btn-sm btn-outline-primary mt-2" data-cwe="{{ cwe_match }}">
+                        <i class="fas fa-search me-1"></i>快速查询
+                    </button>
+                    {% endif %}
+                    {% endwith %}
+                    {% else %}
+                    <a href="https://www.sogou.com/web?query={{ vulnerability_type }}+漏洞" target="_blank" class="btn btn-sm btn-outline-secondary mt-2">
+                        <i class="fas fa-search me-1"></i>搜索漏洞信息
+                    </a>
+                    {% endif %}
+                </p>
+                
+                {% if 'CWE-' in vulnerability_type %}
+                <div class="mt-3">
+                    <h6>CWE漏洞说明：</h6>
+                    <div class="cwe-info">
+                        {% with cwe_number=vulnerability_type|cwe_extract %}
+                        {% if cwe_number == '119' %}
+                        <p>CWE-119: 内存边界受限缓冲区的错误限制</p>
+                        <p>该弱点可导致缓冲区溢出，可能被攻击者利用执行未授权代码或导致拒绝服务攻击。</p>
+                        {% elif cwe_number == '120' %}
+                        <p>CWE-120: 缓冲区复制时没有检查输入大小</p>
+                        <p>程序复制缓冲区内的数据时未验证输入大小，可能导致缓冲区溢出攻击。</p>
+                        {% elif cwe_number == '121' %}
+                        <p>CWE-121: 基于栈的缓冲区溢出</p>
+                        <p>写入分配在栈上的缓冲区的数据超过了缓冲区的范围，可导致程序控制流劫持。</p>
+                        {% elif cwe_number == '122' %}
+                        <p>CWE-122: 基于堆的缓冲区溢出</p>
+                        <p>写入分配在堆上的缓冲区的数据超过了缓冲区的范围，可能导致代码执行或程序崩溃。</p>
+                        {% elif cwe_number == '125' %}
+                        <p>CWE-125: 越界读取</p>
+                        <p>程序从其预期边界之外的缓冲区或内存位置读取数据，可能泄露敏感信息。</p>
+                        {% elif cwe_number == '787' %}
+                        <p>CWE-787: 越界写入</p>
+                        <p>程序写入超出目标缓冲区边界的数据，可能导致数据损坏、崩溃或代码执行。</p>
+                        {% else %}
+                        <p>关于该漏洞的具体信息，请点击上方链接查看MITRE CWE数据库。</p>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- CWE查询 -->
+                <div class="mt-4">
+                    <div class="card-header bg-light">
+                        <i class="fas fa-search me-2"></i>CWE漏洞查询
+                    </div>
+                    <div class="card-body p-3">
+                        <form id="cwe-search-form">
+                            <div class="input-group mb-3">
+                                <input type="number" class="form-control" id="cwe-number" placeholder="输入CWE编号" min="1" max="9999">
+                                <button class="btn btn-primary" type="submit" id="search-cwe-btn">
+                                    <i class="fas fa-search"></i> 查询
+                                </button>
+                            </div>
+                        </form>
+                        <div id="cwe-result" class="mt-3">
+                            <div class="text-center text-muted small">
+                                <p>输入CWE编号查询漏洞详情</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <div class="card mt-4">
+            <div class="card-body">
+                <h5 class="card-title mb-3">
+                    <i class="fas fa-info-circle me-2"></i>处理建议
+                </h5>
+                <div class="card-text">
+                    {% if analysis.analysis_type == 'vulnerability' %}
+                    <p>根据分析结果，建议您：</p>
+                    <ul class="mb-0">
+                        {% if 'buffer' in vulnerability_type|lower or 'overflow' in vulnerability_type|lower or 'CWE-119' in vulnerability_type or 'CWE-120' in vulnerability_type or 'CWE-121' in vulnerability_type or 'CWE-122' in vulnerability_type %}
+                        <li>使用安全的字符串和内存操作函数，如strncpy代替strcpy</li>
+                        <li>增加输入验证和边界检查</li>
+                        <li>考虑使用更安全的编程语言或启用编译器安全选项</li>
+                        {% elif 'use-after-free' in vulnerability_type|lower or 'CWE-416' in vulnerability_type %}
+                        <li>确保在释放内存后将指针设置为NULL</li>
+                        <li>实现适当的内存管理策略</li>
+                        <li>考虑使用智能指针或自动内存管理</li>
+                        {% elif 'format' in vulnerability_type|lower or 'CWE-134' in vulnerability_type %}
+                        <li>使用固定的格式字符串</li>
+                        <li>确保用户输入不会直接作为格式字符串参数</li>
+                        {% else %}
+                        <li>进行全面的代码安全审查</li>
+                        <li>遵循安全编码标准和最佳实践</li>
+                        <li>实施适当的输入验证和边界检查</li>
+                        <li>定期进行漏洞扫描和安全测试</li>
+                        {% endif %}
+                    </ul>
+                    {% else %}
+                    <p>二进制比对结果可以帮助您：</p>
+                    <ul class="mb-0">
+                        <li>识别代码克隆与重用</li>
+                        <li>分析软件演化</li>
+                        <li>检测潜在的版权问题</li>
+                        <li>评估代码重构效果</li>
+                    </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化漏洞类型分布饼状图
+    const vulnTypePieChart = document.getElementById('vulnTypePieChart');
+    if (vulnTypePieChart) {
+        // 从Django模板中获取漏洞类型数据
+        const vulnTypeData = [
+            {% for vuln_type, data in vuln_type_percentages.items %}
+                {
+                    type: "{{ vuln_type }}",
+                    count: {{ data.count }},
+                    percentage: {{ data.percentage }}
+                }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        if (vulnTypeData.length > 0) {
+            // 准备饼状图数据
+            const labels = vulnTypeData.map(item => item.type);
+            const counts = vulnTypeData.map(item => item.count);
+            
+            // 生成颜色
+            const baseColors = [
+                'rgb(255, 99, 132)',   // 红色
+                'rgb(54, 162, 235)',   // 蓝色
+                'rgb(255, 206, 86)',   // 黄色
+                'rgb(75, 192, 192)',   // 青绿色
+                'rgb(153, 102, 255)',  // 紫色
+                'rgb(255, 159, 64)',   // 橙色
+                'rgb(199, 199, 199)',  // 灰色
+                'rgb(83, 102, 255)',   // 靛蓝色
+                'rgb(255, 99, 255)',   // 粉色
+                'rgb(99, 255, 132)'    // 浅绿色
+            ];
+            
+            // 如果需要更多颜色，则随机生成
+            let colors = [...baseColors];
+            while (colors.length < vulnTypeData.length) {
+                const r = Math.floor(Math.random() * 255);
+                const g = Math.floor(Math.random() * 255);
+                const b = Math.floor(Math.random() * 255);
+                colors.push(`rgb(${r}, ${g}, ${b})`);
+            }
+            
+            colors = colors.slice(0, vulnTypeData.length);
+            
+            // 创建饼状图
+            new Chart(vulnTypePieChart, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: counts,
+                        backgroundColor: colors,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    layout: {
+                        padding: {
+                            left: 5,
+                            right: 5,
+                            top: 5,
+                            bottom: 5
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 10,
+                                font: {
+                                    size: 11
+                                }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || '';
+                                    const percentage = vulnTypeData[context.dataIndex].percentage.toFixed(1);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // 初始化漏洞函数分析结果柱形图
+    const chartCanvas = document.getElementById('vulnerabilityChart');
+    if (chartCanvas) {
+        const ctx = chartCanvas.getContext('2d');
+        
+        // 准备数据
+        const labels = [
+            {% for file, score, percentage in top_results %}
+                "{{ file|escapejs }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        const data = [
+            {% for file, score, percentage in top_results %}
+                {{ percentage|floatformat:2 }}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        // 设置颜色
+        const backgroundColors = data.map(value => {
+            if (value > 70) return 'rgba(220, 53, 69, 0.8)'; // 危险
+            if (value > 50) return 'rgba(255, 193, 7, 0.8)'; // 警告
+            return 'rgba(13, 110, 253, 0.8)'; // 一般
+        });
+        
+        // 创建图表
+        if (labels.length > 0) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '相似度百分比',
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: backgroundColors.map(color => color.replace('0.8', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `相似度: ${context.raw.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: '相似度百分比'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '漏洞样本'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // 初始化函数对比较柱形图
+    const functionPairsCanvas = document.getElementById('functionPairsChart');
+    if (functionPairsCanvas) {
+        const ctx = functionPairsCanvas.getContext('2d');
+        
+        // 准备数据
+        const labels = [
+            {% for pair in top_pairs %}
+                "{{ pair.func1|truncatechars:20|escapejs }} - {{ pair.func2|truncatechars:20|escapejs }}"{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        const data = [
+            {% for pair in top_pairs %}
+                {{ pair.percentage|floatformat:2 }}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        // 设置颜色
+        const backgroundColors = data.map(value => {
+            if (value > 70) return 'rgba(54, 162, 235, 0.8)'; // 高相似度
+            if (value > 50) return 'rgba(75, 192, 192, 0.8)'; // 中相似度
+            return 'rgba(153, 102, 255, 0.8)'; // 低相似度
+        });
+        
+        // 创建图表
+        if (labels.length > 0) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: '函数对相似度',
+                        data: data,
+                        backgroundColor: backgroundColors,
+                        borderColor: backgroundColors.map(color => color.replace('0.8', '1')),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `相似度: ${context.raw.toFixed(2)}%`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: '相似度百分比'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '函数对'
+                            },
+                            ticks: {
+                                maxRotation: 45,
+                                minRotation: 45
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+    
+    // CWE查询功能
+    const cweSearchForm = document.getElementById('cwe-search-form');
+    const cweResult = document.getElementById('cwe-result');
+    
+    // 查询CWE信息的函数
+    function queryCWE(cweNumber) {
+        if (!cweNumber) {
+            cweResult.innerHTML = '<div class="alert alert-warning">请输入有效的CWE编号</div>';
+            return;
+        }
+        
+        // 显示加载状态
+        cweResult.innerHTML = '<div class="text-center"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">加载中...</span></div><p class="mt-2">正在查询...</p></div>';
+        
+        // 使用后端API获取CWE信息
+        fetch(`/api/cwe/${cweNumber}/`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`请求失败，状态码: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (!data.success) {
+                    throw new Error(data.error || '获取CWE信息失败');
+                }
+                
+                // 显示结果
+                cweResult.innerHTML = `
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            CWE-${data.cwe_number}
+                        </div>
+                        <div class="card-body">
+                            <h5 class="card-title">${data.title}</h5>
+                            <p class="card-text small">${data.description.substring(0, 300)}${data.description.length > 300 ? '...' : ''}</p>
+                            <a href="${data.url}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                查看完整信息
+                            </a>
+                        </div>
+                    </div>
+                `;
+            })
+            .catch(error => {
+                cweResult.innerHTML = `<div class="alert alert-danger">错误: ${error.message}</div>`;
+            });
+    }
+    
+    // 为搜索表单添加事件监听
+    if (cweSearchForm) {
+        cweSearchForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const cweNumber = document.getElementById('cwe-number').value.trim();
+            queryCWE(cweNumber);
+        });
+    }
+    
+    // 为快速查询按钮添加事件监听
+    const quickSearchBtn = document.getElementById('quick-search-cwe');
+    if (quickSearchBtn) {
+        quickSearchBtn.addEventListener('click', function() {
+            const cweNumber = this.getAttribute('data-cwe');
+            if (cweNumber) {
+                // 如果有输入框，填入值
+                const cweInput = document.getElementById('cwe-number');
+                if (cweInput) {
+                    cweInput.value = cweNumber;
+                }
+                
+                // 执行查询
+                queryCWE(cweNumber);
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 
